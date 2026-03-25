@@ -63,7 +63,7 @@ void setup() {
 
   Serial.println("ESP32 BLE Touch Trigger startet...");
 
-  BLEDevice::init("ESP32-Touch-Trigger");
+  BLEDevice::init("ESP32-Example");
 
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
