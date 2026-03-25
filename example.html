@@ -299,6 +299,10 @@
         stopSound("sound3");
       }
     });
+    if (!navigator.bluetooth) {
+      document.getElementById("status").textContent =
+        "Web Bluetooth wird auf diesem Gerät oder Browser nicht unterstützt.";
+    }
   </script>
 </body>
 </html>
