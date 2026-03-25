@@ -240,7 +240,7 @@
         statusEl.textContent = "Suche ESP32...";
 
         const device = await navigator.bluetooth.requestDevice({
-          filters: [{ name: "ESP32-Touch-Trigger" }],
+          filters: [{ name: "ESP32-Example" }],
           optionalServices: [SERVICE_UUID]
         });
 
