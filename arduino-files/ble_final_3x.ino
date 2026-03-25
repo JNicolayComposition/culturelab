@@ -20,23 +20,26 @@ bool wasTouched3 = false;
 
 // BLE
 BLECharacteristic *pCharacteristic;
+BLEServer *pServer;
+BLEAdvertising *pAdvertising;
 bool deviceConnected = false;
 
-// Eigene UUIDs
+// UUIDs
 #define SERVICE_UUID        "12345678-1234-1234-1234-1234567890ab"
 #define CHARACTERISTIC_UUID "abcdefab-1234-1234-1234-abcdefabcdef"
 
 class MyServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer* pServer) override {
+  void onConnect(BLEServer* server) override {
     deviceConnected = true;
     Serial.println("BLE verbunden");
   }
 
-  void onDisconnect(BLEServer* pServer) override {
+  void onDisconnect(BLEServer* server) override {
     deviceConnected = false;
     Serial.println("BLE getrennt");
 
-    BLEDevice::startAdvertising();
+    delay(200);
+    pAdvertising->start();
     Serial.println("Advertising neu gestartet");
   }
 };
@@ -60,10 +63,9 @@ void setup() {
 
   Serial.println("ESP32 BLE Touch Trigger startet...");
 
-  // BLE initialisieren
   BLEDevice::init("ESP32-Touch-Trigger");
 
-  BLEServer *pServer = BLEDevice::createServer();
+  pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
   BLEService *pService = pServer->createService(SERVICE_UUID);
@@ -79,7 +81,9 @@ void setup() {
 
   pService->start();
 
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
   pAdvertising->start();
 
   Serial.println("BLE Advertising gestartet");
@@ -94,7 +98,6 @@ void loop() {
   bool isTouched2 = (value2 < threshold2);
   bool isTouched3 = (value3 < threshold3);
 
-  // Pin 27 -> sound1
   if (isTouched1 && !wasTouched1) {
     Serial.print("TOUCH 27 | Wert: ");
     Serial.println(value1);
@@ -105,7 +108,6 @@ void loop() {
     sendTrigger("sound1_off");
   }
 
-  // Pin 33 -> sound2
   if (isTouched2 && !wasTouched2) {
     Serial.print("TOUCH 33 | Wert: ");
     Serial.println(value2);
@@ -116,7 +118,6 @@ void loop() {
     sendTrigger("sound2_off");
   }
 
-  // Pin 32 -> sound3
   if (isTouched3 && !wasTouched3) {
     Serial.print("TOUCH 32 | Wert: ");
     Serial.println(value3);
