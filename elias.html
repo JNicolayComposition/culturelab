@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP32 Touch Trigger</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      line-height: 1.5;
+      max-width: 760px;
+      margin: auto;
+      background: #fafafa;
+      color: #111;
+    }
+
+    h1 {
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      margin-top: 0;
+      color: #444;
+    }
+
+    .row {
+      margin: 1rem 0;
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      font-size: 1rem;
+      padding: 0.8rem 1rem;
+      border: none;
+      border-radius: 10px;
+      background: #111;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .secondary {
+      background: #666;
+    }
+
+    #status {
+      font-weight: 600;
+      margin: 1rem 0;
+    }
+
+    #log {
+      margin-top: 1rem;
+      white-space: pre-line;
+      background: #f1f1f1;
+      padding: 1rem;
+      border-radius: 12px;
+      min-height: 180px;
+      overflow-wrap: anywhere;
+      font-family: monospace;
+      font-size: 0.95rem;
+    }
+
+    .small {
+      font-size: 0.92rem;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>ESP32 Elias</h1>
+  <p>Touch-Pins am ESP steuern deine Sounds über den Browser. Du kannst die leitfähigen Flächen mit einem Kabel an deinem ESP verbinden und dann die Flächen berühren um die Sounds abzuspielen. Viel Spaß! :-)</p>
+
+  <div class="row">
+    <button id="connectBtn">Mit ESP verbinden</button>
+  </div>
+
+  <div class="row">
+    <button id="test1" class="secondary">Sound 1 an/aus</button>
+    <button id="test2" class="secondary">Sound 2 an/aus</button>
+    <button id="test3" class="secondary">Sound 3 an/aus</button>
+  </div>
+
+  <div id="status">Noch nicht verbunden</div>
+  <div class="small">Wenn beim ersten Klick auf Test oder Verbinden Audio freigegeben werden muss, ist das normal.</div>
+
+  <div id="log"></div>
+
+  <script>
+    const SERVICE_UUID = "12345678-1234-1234-1234-1234567890ab";
+    const CHARACTERISTIC_UUID = "abcdefab-1234-1234-1234-abcdefabcdef";
+
+    const connectBtn = document.getElementById("connectBtn");
+    const statusEl = document.getElementById("status");
+    const logEl = document.getElementById("log");
+
+    const sounds = {
+      sound1: new Audio("./sounds/Kirsche.mp3"),
+      sound2: new Audio("./sounds/Orange.mp3"),
+      sound3: new Audio("./sounds/Zitrone.mp3"),
+    };
+
+    const fadeIntervals = {
+      sound1: null,
+      sound2: null,
+      sound3: null,
+    };
+
+    const testState = {
+      sound1: false,
+      sound2: false,
+      sound3: false,
+    };
+
+    for (const [name, audio] of Object.entries(sounds)) {
+      audio.preload = "auto";
+      audio.loop = true;
+      audio.volume = 1.0;
+
+      audio.addEventListener("loadeddata", () => {
+        log(`${name}: loadeddata`);
+      });
+
+      audio.addEventListener("canplay", () => {
+        log(`${name}: canplay`);
+      });
+
+      audio.addEventListener("canplaythrough", () => {
+        log(`${name}: canplaythrough`);
+      });
+
+      audio.addEventListener("error", () => {
+        const err = audio.error;
+        log(`${name}: FEHLER ${err ? err.code : "unbekannt"} | src=${audio.currentSrc || audio.src}`);
+      });
+    }
+
+    function log(message) {
+      console.log(message);
+      logEl.textContent = message + "\n" + logEl.textContent;
+    }
+
+    function clearFade(name) {
+      if (fadeIntervals[name]) {
+        clearInterval(fadeIntervals[name]);
+        fadeIntervals[name] = null;
+      }
+    }
+
+    async function startSound(name) {
+      const audio = sounds[name];
+      if (!audio) {
+        log(`Unbekannter Sound: ${name}`);
+        return;
+      }
+
+      clearFade(name);
+
+      try {
+        audio.volume = 1.0;
+        if (audio.paused) {
+          audio.currentTime = 0;
+          await audio.play();
+          log(`${name}: an`);
+        }
+      } catch (err) {
+        log(`${name}: start-Fehler: ${err}`);
+      }
+    }
+
+    function stopSound(name, duration = 120) {
+      const audio = sounds[name];
+      if (!audio) {
+        log(`Unbekannter Sound beim Stoppen: ${name}`);
+        return;
+      }
+
+      if (audio.paused) return;
+
+      clearFade(name);
+
+      const steps = 6;
+      const stepTime = duration / steps;
+      const startVolume = audio.volume;
+
+      let currentStep = 0;
+
+      fadeIntervals[name] = setInterval(() => {
+        currentStep++;
+        audio.volume = Math.max(0, startVolume * (1 - currentStep / steps));
+
+        if (currentStep >= steps) {
+          clearInterval(fadeIntervals[name]);
+          fadeIntervals[name] = null;
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = 1.0;
+          log(`${name}: aus`);
+        }
+      }, stepTime);
+    }
+
+    function handleTrigger(value) {
+      log(`Empfangen: ${value}`);
+
+      switch (value) {
+        case "sound1_on":
+          startSound("sound1");
+          break;
+        case "sound1_off":
+          stopSound("sound1");
+          break;
+
+        case "sound2_on":
+          startSound("sound2");
+          break;
+        case "sound2_off":
+          stopSound("sound2");
+          break;
+
+        case "sound3_on":
+          startSound("sound3");
+          break;
+        case "sound3_off":
+          stopSound("sound3");
+          break;
+
+        default:
+          log(`Unbekannter Trigger: ${value}`);
+      }
+    }
+
+    async function connectToEsp() {
+      try {
+        statusEl.textContent = "Suche ESP32...";
+
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }],
+          optionalServices: [SERVICE_UUID]
+        });
+
+        device.addEventListener("gattserverdisconnected", () => {
+          statusEl.textContent = "Verbindung getrennt";
+          log("ESP getrennt");
+        });
+
+        statusEl.textContent = "Verbinde...";
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+        await characteristic.startNotifications();
+
+        characteristic.addEventListener("characteristicvaluechanged", (event) => {
+          const value = new TextDecoder().decode(event.target.value);
+          statusEl.textContent = "Verbunden mit ESP32";
+          handleTrigger(value);
+        });
+
+        statusEl.textContent = "Verbunden mit ESP32";
+        log("Bluetooth verbunden");
+      } catch (error) {
+        statusEl.textContent = "Fehler bei Verbindung";
+        log("Verbindungsfehler: " + error);
+        console.error(error);
+      }
+    }
+
+    connectBtn.addEventListener("click", connectToEsp);
+
+    document.getElementById("test1").addEventListener("click", async () => {
+      testState.sound1 = !testState.sound1;
+      if (testState.sound1) {
+        await startSound("sound1");
+      } else {
+        stopSound("sound1");
+      }
+    });
+
+    document.getElementById("test2").addEventListener("click", async () => {
+      testState.sound2 = !testState.sound2;
+      if (testState.sound2) {
+        await startSound("sound2");
+      } else {
+        stopSound("sound2");
+      }
+    });
+
+    document.getElementById("test3").addEventListener("click", async () => {
+      testState.sound3 = !testState.sound3;
+      if (testState.sound3) {
+        await startSound("sound3");
+      } else {
+        stopSound("sound3");
+      }
+    });
+    if (!navigator.bluetooth) {
+      document.getElementById("status").textContent =
+        "Web Bluetooth wird auf diesem Gerät oder Browser nicht unterstützt.";
+    }
+  </script>
+</body>
+</html>
