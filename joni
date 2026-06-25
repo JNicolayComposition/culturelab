@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JONI Sound Instrument</title>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: 2rem;
+      line-height: 1.5;
+      max-width: 860px;
+      margin: auto;
+      background: #faf7f0;
+      color: #111;
+    }
+
+    h1 {
+      margin-bottom: 0.4rem;
+      font-size: 2rem;
+    }
+
+    p {
+      margin-top: 0;
+      color: #444;
+    }
+
+    .card {
+      background: white;
+      padding: 1.2rem;
+      border-radius: 18px;
+      margin: 1rem 0;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    }
+
+    .row {
+      margin: 1rem 0;
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      font-size: 1rem;
+      padding: 0.85rem 1.1rem;
+      border: none;
+      border-radius: 12px;
+      background: #111;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    button.secondary {
+      background: #666;
+    }
+
+    button.sound {
+      background: #2f4f4f;
+    }
+
+    button.pitch {
+      background: #5b3f8c;
+    }
+
+    button.volume {
+      background: #8c4a2f;
+    }
+
+    #status {
+      font-weight: 700;
+      margin: 1rem 0;
+    }
+
+    .small {
+      font-size: 0.92rem;
+      color: #555;
+    }
+
+    .meter {
+      margin: 0.75rem 0;
+    }
+
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .bar {
+      height: 18px;
+      background: #e7e1d8;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 50%;
+      background: #111;
+      border-radius: 999px;
+      transition: width 0.08s linear;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .state {
+      padding: 0.75rem;
+      background: #f2eee7;
+      border-radius: 14px;
+      font-weight: 650;
+    }
+
+    .active {
+      background: #cdeccf;
+    }
+
+    #log {
+      margin-top: 1rem;
+      white-space: pre-line;
+      background: #f1f1f1;
+      padding: 1rem;
+      border-radius: 12px;
+      min-height: 160px;
+      max-height: 260px;
+      overflow-y: auto;
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>JONI Sound Instrument</h1>
+
+  <p>
+    Touch-Flächen am ESP32 steuern zwei geloopte Sounds.
+    Die Klangflächen starten und stoppen Loops. Andere Flächen verändern beim Halten Pitch und Lautstärke.
+  </p>
+
+  <div class="card">
+    <div class="row">
+      <button id="audioBtn">Audio vorbereiten</button>
+      <button id="connectBtn">Mit ESP32 verbinden</button>
+    </div>
+
+    <div id="status">Noch nicht verbunden</div>
+
+    <div class="small">
+      Wichtig: Im Browser muss Audio meistens einmal durch einen Klick freigegeben werden.
+      Klicke zuerst auf „Audio vorbereiten“.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Test ohne ESP32</h2>
+
+    <div class="row">
+      <button id="testSample1" class="sound">Sample 1 an/aus</button>
+      <button id="testSample2" class="sound">Sample 2 an/aus</button>
+    </div>
+
+    <div class="row">
+      <button id="testPitchDown" class="pitch">Pitch runter halten</button>
+      <button id="testPitchUp" class="pitch">Pitch hoch halten</button>
+    </div>
+
+    <div class="row">
+      <button id="testVolumeDown" class="volume">Leiser halten</button>
+      <button id="testVolumeUp" class="volume">Lauter halten</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Klangzustand</h2>
+
+    <div class="meter">
+      <div class="meter-label">
+        <span>Pitch</span>
+        <span id="pitchValue">1.00</span>
+      </div>
+      <div class="bar">
+        <div id="pitchBar" class="bar-fill"></div>
+      </div>
+    </div>
+
+    <div class="meter">
+      <div class="meter-label">
+        <span>Lautstärke</span>
+        <span id="volumeValue">0.80</span>
+      </div>
+      <div class="bar">
+        <div id="volumeBar" class="bar-fill"></div>
+      </div>
+    </div>
+
+    <div class="state-grid">
+      <div id="sample1State" class="state">Sample 1: aus</div>
+      <div id="sample2State" class="state">Sample 2: aus</div>
+      <div id="pitchState" class="state">Pitch: neutral</div>
+      <div id="volumeState" class="state">Dynamik: neutral</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </div>
+
+  <script>
+    const SERVICE_UUID = "12345678-1234-1234-1234-1234567890ab";
+    const CHARACTERISTIC_UUID = "abcdefab-1234-1234-1234-abcdefabcdef";
+
+    const audioBtn = document.getElementById("audioBtn");
+    const connectBtn = document.getElementById("connectBtn");
+    const statusEl = document.getElementById("status");
+    const logEl = document.getElementById("log");
+
+    const pitchValueEl = document.getElementById("pitchValue");
+    const volumeValueEl = document.getElementById("volumeValue");
+    const pitchBarEl = document.getElementById("pitchBar");
+    const volumeBarEl = document.getElementById("volumeBar");
+
+    const sample1StateEl = document.getElementById("sample1State");
+    const sample2StateEl = document.getElementById("sample2State");
+    const pitchStateEl = document.getElementById("pitchState");
+    const volumeStateEl = document.getElementById("volumeState");
+
+    const sampleFiles = {
+      sample1: "./sounds/blatt.mp3",
+      sample2: "./sounds/stock.mp3"
+    };
+
+    let audioContext = null;
+    let masterGain = null;
+
+    let sampleBuffers = {
+      sample1: null,
+      sample2: null
+    };
+
+    let sampleSources = {
+      sample1: null,
+      sample2: null
+    };
+
+    let sampleGains = {
+      sample1: null,
+      sample2: null
+    };
+
+    let samplePlaying = {
+      sample1: false,
+      sample2: false
+    };
+
+    let pitch = 1.0;
+    let volume = 0.8;
+
+    const minPitch = 0.45;
+    const maxPitch = 2.2;
+
+    const minVolume = 0.0;
+    const maxVolume = 1.0;
+
+    let pitchUpActive = false;
+    let pitchDownActive = false;
+    let volumeUpActive = false;
+    let volumeDownActive = false;
+
+    let modulationLoopStarted = false;
+
+    function log(message) {
+      console.log(message);
+      logEl.textContent = message + "\n" + logEl.textContent;
+    }
+
+    async function initAudio() {
+      try {
+        if (!audioContext) {
+          audioContext = new AudioContext();
+
+          masterGain = audioContext.createGain();
+          masterGain.gain.value = volume;
+          masterGain.connect(audioContext.destination);
+
+          sampleGains.sample1 = audioContext.createGain();
+          sampleGains.sample2 = audioContext.createGain();
+
+          sampleGains.sample1.gain.value = 1.0;
+          sampleGains.sample2.gain.value = 1.0;
+
+          sampleGains.sample1.connect(masterGain);
+          sampleGains.sample2.connect(masterGain);
+
+          log("AudioContext erstellt");
+        }
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+          log("AudioContext aktiviert");
+        }
+
+        await loadAllSamples();
+
+        if (!modulationLoopStarted) {
+          startModulationLoop();
+          modulationLoopStarted = true;
+        }
+
+        updateDisplay();
+        log("Audio bereit");
+      } catch (error) {
+        log("Audio-Fehler: " + error);
+        console.error(error);
+      }
+    }
+
+    async function loadAllSamples() {
+      for (const [name, url] of Object.entries(sampleFiles)) {
+        if (!sampleBuffers[name]) {
+          sampleBuffers[name] = await loadSample(url);
+          log(`${name} geladen: ${url}`);
+        }
+      }
+    }
+
+    async function loadSample(url) {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Konnte Sample nicht laden: ${url}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      return audioBuffer;
+    }
+
+    async function ensureAudioReady() {
+      if (!audioContext || !sampleBuffers.sample1 || !sampleBuffers.sample2) {
+        await initAudio();
+      }
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+    }
+
+    async function toggleSample(name) {
+      await ensureAudioReady();
+
+      if (samplePlaying[name]) {
+        stopSample(name);
+      } else {
+        startSample(name);
+      }
+    }
+
+    function startSample(name) {
+      const buffer = sampleBuffers[name];
+
+      if (!buffer) {
+        log(`Kein Buffer für ${name}`);
+        return;
+      }
+
+      if (sampleSources[name]) {
+        stopSample(name, 0);
+      }
+
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.loop = true;
+      source.playbackRate.value = pitch;
+
+      source.connect(sampleGains[name]);
+      source.start();
+
+      sampleSources[name] = source;
+      samplePlaying[name] = true;
+
+      source.onended = () => {
+        if (sampleSources[name] === source) {
+          sampleSources[name] = null;
+          samplePlaying[name] = false;
+          updateDisplay();
+        }
+      };
+
+      log(`${name}: Loop gestartet`);
+      updateDisplay();
+    }
+
+    function stopSample(name, fadeMs = 120) {
+      const source = sampleSources[name];
+
+      if (!source) {
+        samplePlaying[name] = false;
+        updateDisplay();
+        return;
+      }
+
+      const gainNode = sampleGains[name];
+      const now = audioContext.currentTime;
+
+      try {
+        gainNode.gain.cancelScheduledValues(now);
+        gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+
+        if (fadeMs > 0) {
+          gainNode.gain.linearRampToValueAtTime(0.0, now + fadeMs / 1000);
+          source.stop(now + fadeMs / 1000 + 0.02);
+        } else {
+          source.stop(now);
+        }
+
+        setTimeout(() => {
+          gainNode.gain.value = 1.0;
+        }, fadeMs + 50);
+      } catch (error) {
+        log(`${name}: Stop-Fehler: ${error}`);
+      }
+
+      sampleSources[name] = null;
+      samplePlaying[name] = false;
+
+      log(`${name}: Loop gestoppt`);
+      updateDisplay();
+    }
+
+    function startModulationLoop() {
+      setInterval(() => {
+        let pitchChanged = false;
+        let volumeChanged = false;
+
+        if (pitchUpActive) {
+          pitch += 0.012;
+          pitchChanged = true;
+        }
+
+        if (pitchDownActive) {
+          pitch -= 0.012;
+          pitchChanged = true;
+        }
+
+        if (volumeUpActive) {
+          volume += 0.012;
+          volumeChanged = true;
+        }
+
+        if (volumeDownActive) {
+          volume -= 0.012;
+          volumeChanged = true;
+        }
+
+        pitch = clamp(pitch, minPitch, maxPitch);
+        volume = clamp(volume, minVolume, maxVolume);
+
+        if (pitchChanged || volumeChanged) {
+          applySoundParameters();
+          updateDisplay();
+        }
+      }, 30);
+
+      log("Modulations-Loop gestartet");
+    }
+
+    function applySoundParameters() {
+      for (const source of Object.values(sampleSources)) {
+        if (source) {
+          source.playbackRate.value = pitch;
+        }
+      }
+
+      if (masterGain) {
+        masterGain.gain.value = volume;
+      }
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function updateDisplay() {
+      pitchValueEl.textContent = pitch.toFixed(2);
+      volumeValueEl.textContent = volume.toFixed(2);
+
+      const pitchPercent = ((pitch - minPitch) / (maxPitch - minPitch)) * 100;
+      const volumePercent = ((volume - minVolume) / (maxVolume - minVolume)) * 100;
+
+      pitchBarEl.style.width = `${pitchPercent}%`;
+      volumeBarEl.style.width = `${volumePercent}%`;
+
+      sample1StateEl.textContent = samplePlaying.sample1 ? "Sample 1: läuft" : "Sample 1: aus";
+      sample2StateEl.textContent = samplePlaying.sample2 ? "Sample 2: läuft" : "Sample 2: aus";
+
+      sample1StateEl.classList.toggle("active", samplePlaying.sample1);
+      sample2StateEl.classList.toggle("active", samplePlaying.sample2);
+
+      if (pitchUpActive && !pitchDownActive) {
+        pitchStateEl.textContent = "Pitch: steigt";
+        pitchStateEl.classList.add("active");
+      } else if (pitchDownActive && !pitchUpActive) {
+        pitchStateEl.textContent = "Pitch: sinkt";
+        pitchStateEl.classList.add("active");
+      } else if (pitchUpActive && pitchDownActive) {
+        pitchStateEl.textContent = "Pitch: beide berührt";
+        pitchStateEl.classList.add("active");
+      } else {
+        pitchStateEl.textContent = "Pitch: neutral";
+        pitchStateEl.classList.remove("active");
+      }
+
+      if (volumeUpActive && !volumeDownActive) {
+        volumeStateEl.textContent = "Dynamik: lauter";
+        volumeStateEl.classList.add("active");
+      } else if (volumeDownActive && !volumeUpActive) {
+        volumeStateEl.textContent = "Dynamik: leiser";
+        volumeStateEl.classList.add("active");
+      } else if (volumeUpActive && volumeDownActive) {
+        volumeStateEl.textContent = "Dynamik: beide berührt";
+        volumeStateEl.classList.add("active");
+      } else {
+        volumeStateEl.textContent = "Dynamik: neutral";
+        volumeStateEl.classList.remove("active");
+      }
+    }
+
+    async function handleTrigger(value) {
+      const message = value.trim();
+      log(`Empfangen: ${message}`);
+
+      switch (message) {
+        // Neue JONI-Befehle
+        case "sample1_toggle":
+          await toggleSample("sample1");
+          break;
+
+        case "sample2_toggle":
+          await toggleSample("sample2");
+          break;
+
+        case "pitch_up_on":
+          pitchUpActive = true;
+          updateDisplay();
+          break;
+
+        case "pitch_up_off":
+          pitchUpActive = false;
+          updateDisplay();
+          break;
+
+        case "pitch_down_on":
+          pitchDownActive = true;
+          updateDisplay();
+          break;
+
+        case "pitch_down_off":
+          pitchDownActive = false;
+          updateDisplay();
+          break;
+
+        case "volume_up_on":
+          volumeUpActive = true;
+          updateDisplay();
+          break;
+
+        case "volume_up_off":
+          volumeUpActive = false;
+          updateDisplay();
+          break;
+
+        case "volume_down_on":
+          volumeDownActive = true;
+          updateDisplay();
+          break;
+
+        case "volume_down_off":
+          volumeDownActive = false;
+          updateDisplay();
+          break;
+
+        // Alte Befehle aus deiner ersten Version, zur Sicherheit weiterhin unterstützt
+        case "sound1_on":
+          await ensureAudioReady();
+          startSample("sample1");
+          break;
+
+        case "sound1_off":
+          stopSample("sample1");
+          break;
+
+        case "sound2_on":
+          await ensureAudioReady();
+          startSample("sample2");
+          break;
+
+        case "sound2_off":
+          stopSample("sample2");
+          break;
+
+        default:
+          log(`Unbekannter Trigger: ${message}`);
+      }
+    }
+
+    async function connectToEsp() {
+      try {
+        await initAudio();
+
+        statusEl.textContent = "Suche ESP32...";
+
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }],
+          optionalServices: [SERVICE_UUID]
+        });
+
+        device.addEventListener("gattserverdisconnected", () => {
+          statusEl.textContent = "Verbindung getrennt";
+          log("ESP getrennt");
+        });
+
+        statusEl.textContent = "Verbinde...";
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+
+        await characteristic.startNotifications();
+
+        characteristic.addEventListener("characteristicvaluechanged", (event) => {
+          const value = new TextDecoder().decode(event.target.value);
+          statusEl.textContent = "Verbunden mit ESP32";
+          handleTrigger(value);
+        });
+
+        statusEl.textContent = "Verbunden mit ESP32";
+        log("Bluetooth verbunden");
+      } catch (error) {
+        statusEl.textContent = "Fehler bei Verbindung";
+        log("Verbindungsfehler: " + error);
+        console.error(error);
+      }
+    }
+
+    audioBtn.addEventListener("click", initAudio);
+    connectBtn.addEventListener("click", connectToEsp);
+
+    document.getElementById("testSample1").addEventListener("click", () => {
+      handleTrigger("sample1_toggle");
+    });
+
+    document.getElementById("testSample2").addEventListener("click", () => {
+      handleTrigger("sample2_toggle");
+    });
+
+    function setupHoldButton(id, onMessage, offMessage) {
+      const button = document.getElementById(id);
+
+      const start = () => handleTrigger(onMessage);
+      const stop = () => handleTrigger(offMessage);
+
+      button.addEventListener("mousedown", start);
+      button.addEventListener("mouseup", stop);
+      button.addEventListener("mouseleave", stop);
+
+      button.addEventListener("touchstart", (event) => {
+        event.preventDefault();
+        start();
+      });
+
+      button.addEventListener("touchend", (event) => {
+        event.preventDefault();
+        stop();
+      });
+
+      button.addEventListener("touchcancel", (event) => {
+        event.preventDefault();
+        stop();
+      });
+    }
+
+    setupHoldButton("testPitchUp", "pitch_up_on", "pitch_up_off");
+    setupHoldButton("testPitchDown", "pitch_down_on", "pitch_down_off");
+    setupHoldButton("testVolumeUp", "volume_up_on", "volume_up_off");
+    setupHoldButton("testVolumeDown", "volume_down_on", "volume_down_off");
+
+    if (!navigator.bluetooth) {
+      statusEl.textContent =
+        "Web Bluetooth wird auf diesem Gerät oder Browser nicht unterstützt. Nutze am besten Chrome oder Edge.";
+    }
+
+    updateDisplay();
+  </script>
+</body>
+</html>
