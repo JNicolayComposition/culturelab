@@ -3,39 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ESP32 Touch Trigger Iyas</title>
+
+  <title>IYAS Tonhöhen-Instrument</title>
+
   <style>
     body {
-      font-family: sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       padding: 2rem;
       line-height: 1.5;
-      max-width: 760px;
+      max-width: 920px;
       margin: auto;
-      background: #fafafa;
+      background: #f7f3eb;
       color: #111;
     }
 
     h1 {
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.4rem;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin-top: 0;
     }
 
     p {
-      margin-top: 0;
       color: #444;
     }
 
-    .row {
+    .card {
+      background: white;
+      padding: 1.2rem;
+      border-radius: 18px;
       margin: 1rem 0;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+    }
+
+    .row {
       display: flex;
       gap: 0.75rem;
       flex-wrap: wrap;
+      align-items: center;
+      margin: 1rem 0;
     }
 
     button {
       font-size: 1rem;
-      padding: 0.8rem 1rem;
+      padding: 0.85rem 1.1rem;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       background: #111;
       color: white;
       cursor: pointer;
@@ -49,9 +64,93 @@
       background: #666;
     }
 
+    .mode {
+      background: #3f3a7a;
+    }
+
+    .note {
+      min-width: 110px;
+      min-height: 78px;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .note1 {
+      background: #314f6b;
+    }
+
+    .note2 {
+      background: #3f6685;
+    }
+
+    .note3 {
+      background: #557d8d;
+    }
+
+    .note4 {
+      background: #7b7f52;
+    }
+
+    .note5 {
+      background: #9b6747;
+    }
+
+    .note6 {
+      background: #9c4338;
+    }
+
     #status {
-      font-weight: 600;
+      font-weight: 700;
       margin: 1rem 0;
+    }
+
+    .small {
+      font-size: 0.92rem;
+      color: #555;
+    }
+
+    .meter {
+      margin: 0.75rem 0;
+    }
+
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .bar {
+      height: 18px;
+      background: #e7e1d8;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 50%;
+      background: #111;
+      border-radius: 999px;
+      transition: width 0.12s linear;
+    }
+
+    .state-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .state {
+      padding: 0.75rem;
+      background: #f2eee7;
+      border-radius: 14px;
+      font-weight: 650;
+    }
+
+    .active {
+      background: #cdeccf;
     }
 
     #log {
@@ -60,183 +159,437 @@
       background: #f1f1f1;
       padding: 1rem;
       border-radius: 12px;
-      min-height: 180px;
+      min-height: 150px;
+      max-height: 260px;
+      overflow-y: auto;
       overflow-wrap: anywhere;
-      font-family: monospace;
-      font-size: 0.95rem;
-    }
-
-    .small {
-      font-size: 0.92rem;
-      color: #555;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.9rem;
     }
   </style>
 </head>
+
 <body>
-  <h1>ESP32 Test-Platine</h1>
-  <p>Touch-Pins am ESP steuern deine Sounds über den Browser. Du kannst die leitfähigen Flächen mit einem Kabel an deinem ESP verbinden und dann die Flächen berühren um die Sounds abzuspielen. Viel Spaß! :-)</p>
+  <h1>IYAS Tonhöhen-Instrument</h1>
 
-  <div class="row">
-    <button id="connectBtn">Mit ESP verbinden</button>
+  <p>
+    Berühre eine von sechs Touch-Flächen am ESP32.
+    Jede Fläche steuert eine andere Tonhöhe. Du kannst zwischen Sample, Synth und Beides wechseln.
+  </p>
+
+  <div class="card">
+    <h2>Verbindung & Modus</h2>
+
+    <div class="row">
+      <button id="audioBtn">Audio vorbereiten</button>
+      <button id="connectBtn">Mit ESP32 verbinden</button>
+      <button id="loopBtn" class="secondary">Loop starten/stoppen</button>
+      <button id="modeBtn" class="mode">Modus: Sample</button>
+    </div>
+
+    <div id="status">Noch nicht verbunden</div>
+
+    <div class="small">
+      Klicke zuerst auf „Audio vorbereiten“. Danach kannst du den Loop starten und den ESP32 verbinden.
+      Im Synth-Modus brauchst du den Loop nicht.
+    </div>
   </div>
 
-  <div class="row">
-    <button id="test1" class="secondary">Test Sound 1 an/aus</button>
-    <button id="test2" class="secondary">Test Sound 2 an/aus</button>
-    <button id="test3" class="secondary">Test Sound 3 an/aus</button>
+  <div class="card">
+    <h2>Test ohne ESP32</h2>
+
+    <p class="small">
+      Diese Buttons simulieren die sechs Touch-Flächen.
+    </p>
+
+    <div class="row">
+      <button class="note note1" id="testPitch1">Ton 1<br>tief</button>
+      <button class="note note2" id="testPitch2">Ton 2<br>warm</button>
+      <button class="note note3" id="testPitch3">Ton 3<br>mittel</button>
+      <button class="note note4" id="testPitch4">Ton 4<br>hell</button>
+      <button class="note note5" id="testPitch5">Ton 5<br>hoch</button>
+      <button class="note note6" id="testPitch6">Ton 6<br>sehr hoch</button>
+    </div>
   </div>
 
-  <div id="status">Noch nicht verbunden</div>
-  <div class="small">Wenn beim ersten Klick auf Test oder Verbinden Audio freigegeben werden muss, ist das normal.</div>
+  <div class="card">
+    <h2>Klangzustand</h2>
 
-  <div id="log"></div>
+    <div class="meter">
+      <div class="meter-label">
+        <span>Sample-Tonhöhe / Playback Rate</span>
+        <span id="pitchValue">1.00</span>
+      </div>
+      <div class="bar">
+        <div id="pitchBar" class="bar-fill"></div>
+      </div>
+    </div>
+
+    <div class="state-grid">
+      <div id="modeState" class="state active">Modus: Sample</div>
+      <div id="loopState" class="state">Loop: aus</div>
+      <div id="pitchState" class="state">Tonhöhe: 1.00</div>
+      <div id="noteState" class="state">Synth: bereit</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </div>
 
   <script>
     const SERVICE_UUID = "12345678-1234-1234-1234-1234567890ab";
     const CHARACTERISTIC_UUID = "abcdefab-1234-1234-1234-abcdefabcdef";
 
+    // Hier ggf. Dateinamen ändern:
+    const SAMPLE_FILE = "./sounds/iyas.wav";
+
+    const audioBtn = document.getElementById("audioBtn");
     const connectBtn = document.getElementById("connectBtn");
+    const loopBtn = document.getElementById("loopBtn");
+    const modeBtn = document.getElementById("modeBtn");
+
     const statusEl = document.getElementById("status");
     const logEl = document.getElementById("log");
 
-    const sounds = {
-      sound1: new Audio("./sounds/elenaFisch.mp3"),
-      sound2: new Audio("./sounds/eliasRegen.mp3"),
-      sound3: new Audio("./sounds/haithamExplosion.mp3"),
+    const pitchValueEl = document.getElementById("pitchValue");
+    const pitchBarEl = document.getElementById("pitchBar");
+
+    const modeStateEl = document.getElementById("modeState");
+    const loopStateEl = document.getElementById("loopState");
+    const pitchStateEl = document.getElementById("pitchState");
+    const noteStateEl = document.getElementById("noteState");
+
+    let audioContext = null;
+    let masterGain = null;
+    let sampleBuffer = null;
+    let source = null;
+
+    let loopPlaying = false;
+
+    // Modi:
+    // "sample" = Touch setzt Sample-Pitch
+    // "synth" = Touch spielt Synth-Ton
+    // "both" = Touch setzt Sample-Pitch und spielt Synth-Ton
+    let mode = "sample";
+
+    let pitch = 1.0;
+
+    const minPitch = 0.6;
+    const maxPitch = 2.0;
+
+    // Pentatonik: A3, C4, D4, E4, G4, A4
+    // Klingt meistens schnell angenehm und nicht "falsch".
+    const pitches = {
+      pitch_1: {
+        playbackRate: 0.60,
+        frequency: 220.00,
+        label: "Ton 1: tief",
+        noteName: "A3"
+      },
+      pitch_2: {
+        playbackRate: 0.75,
+        frequency: 261.63,
+        label: "Ton 2: warm",
+        noteName: "C4"
+      },
+      pitch_3: {
+        playbackRate: 0.90,
+        frequency: 293.66,
+        label: "Ton 3: mittel",
+        noteName: "D4"
+      },
+      pitch_4: {
+        playbackRate: 1.00,
+        frequency: 329.63,
+        label: "Ton 4: hell",
+        noteName: "E4"
+      },
+      pitch_5: {
+        playbackRate: 1.35,
+        frequency: 392.00,
+        label: "Ton 5: hoch",
+        noteName: "G4"
+      },
+      pitch_6: {
+        playbackRate: 1.75,
+        frequency: 440.00,
+        label: "Ton 6: sehr hoch",
+        noteName: "A4"
+      }
     };
-
-    const fadeIntervals = {
-      sound1: null,
-      sound2: null,
-      sound3: null,
-    };
-
-    const testState = {
-      sound1: false,
-      sound2: false,
-      sound3: false,
-    };
-
-    for (const [name, audio] of Object.entries(sounds)) {
-      audio.preload = "auto";
-      audio.loop = true;
-      audio.volume = 1.0;
-
-      audio.addEventListener("loadeddata", () => {
-        log(`${name}: loadeddata`);
-      });
-
-      audio.addEventListener("canplay", () => {
-        log(`${name}: canplay`);
-      });
-
-      audio.addEventListener("canplaythrough", () => {
-        log(`${name}: canplaythrough`);
-      });
-
-      audio.addEventListener("error", () => {
-        const err = audio.error;
-        log(`${name}: FEHLER ${err ? err.code : "unbekannt"} | src=${audio.currentSrc || audio.src}`);
-      });
-    }
 
     function log(message) {
       console.log(message);
       logEl.textContent = message + "\n" + logEl.textContent;
     }
 
-    function clearFade(name) {
-      if (fadeIntervals[name]) {
-        clearInterval(fadeIntervals[name]);
-        fadeIntervals[name] = null;
+    async function initAudio() {
+      try {
+        if (!audioContext) {
+          audioContext = new AudioContext();
+
+          masterGain = audioContext.createGain();
+          masterGain.gain.value = 0.9;
+          masterGain.connect(audioContext.destination);
+
+          log("AudioContext erstellt");
+        }
+
+        if (audioContext.state === "suspended") {
+          await audioContext.resume();
+          log("AudioContext aktiviert");
+        }
+
+        if (!sampleBuffer) {
+          sampleBuffer = await loadSample(SAMPLE_FILE);
+          log("Sample geladen: " + SAMPLE_FILE);
+        }
+
+        updateDisplay();
+        log("Audio bereit");
+      } catch (error) {
+        log("Audio-Fehler: " + error);
+        console.error(error);
       }
     }
 
-    async function startSound(name) {
-      const audio = sounds[name];
-      if (!audio) {
-        log(`Unbekannter Sound: ${name}`);
+    async function loadSample(url) {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error("Konnte Sample nicht laden: " + url);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      return audioBuffer;
+    }
+
+    async function ensureAudioReady() {
+      if (!audioContext) {
+        await initAudio();
+      }
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      // Sample muss nur wirklich vorhanden sein, wenn Sample/Beides genutzt wird.
+      if ((mode === "sample" || mode === "both") && !sampleBuffer) {
+        sampleBuffer = await loadSample(SAMPLE_FILE);
+        log("Sample geladen: " + SAMPLE_FILE);
+      }
+    }
+
+    async function toggleLoop() {
+      await ensureAudioReady();
+
+      if (loopPlaying) {
+        stopLoop();
+      } else {
+        startLoop();
+      }
+    }
+
+    function startLoop() {
+      if (!sampleBuffer) {
+        log("Kein Sample geladen");
         return;
       }
 
-      clearFade(name);
+      if (source) {
+        stopLoop(0);
+      }
+
+      source = audioContext.createBufferSource();
+      source.buffer = sampleBuffer;
+      source.loop = true;
+      source.playbackRate.value = pitch;
+
+      source.connect(masterGain);
+      source.start();
+
+      loopPlaying = true;
+
+      source.onended = () => {
+        source = null;
+        loopPlaying = false;
+        updateDisplay();
+      };
+
+      log("Loop gestartet");
+      updateDisplay();
+    }
+
+    function stopLoop(fadeMs = 120) {
+      if (!source) {
+        loopPlaying = false;
+        updateDisplay();
+        return;
+      }
+
+      const now = audioContext.currentTime;
 
       try {
-        audio.volume = 1.0;
-        if (audio.paused) {
-          audio.currentTime = 0;
-          await audio.play();
-          log(`${name}: an`);
+        if (fadeMs > 0) {
+          masterGain.gain.cancelScheduledValues(now);
+          masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+          masterGain.gain.linearRampToValueAtTime(0.0, now + fadeMs / 1000);
+          source.stop(now + fadeMs / 1000 + 0.02);
+
+          setTimeout(() => {
+            masterGain.gain.value = 0.9;
+          }, fadeMs + 60);
+        } else {
+          source.stop(now);
         }
-      } catch (err) {
-        log(`${name}: start-Fehler: ${err}`);
+      } catch (error) {
+        log("Stop-Fehler: " + error);
       }
+
+      source = null;
+      loopPlaying = false;
+
+      log("Loop gestoppt");
+      updateDisplay();
     }
 
-    function stopSound(name, duration = 120) {
-      const audio = sounds[name];
-      if (!audio) {
-        log(`Unbekannter Sound beim Stoppen: ${name}`);
+    function toggleMode() {
+      if (mode === "sample") {
+        mode = "synth";
+      } else if (mode === "synth") {
+        mode = "both";
+      } else {
+        mode = "sample";
+      }
+
+      updateDisplay();
+      log("Modus gewechselt: " + getModeLabel());
+    }
+
+    function getModeLabel() {
+      if (mode === "sample") return "Sample";
+      if (mode === "synth") return "Synth";
+      if (mode === "both") return "Beides";
+      return mode;
+    }
+
+    async function handlePitchMessage(message) {
+      await ensureAudioReady();
+
+      const pitchInfo = pitches[message];
+
+      if (!pitchInfo) {
+        log("Unbekannte Tonhöhe: " + message);
         return;
       }
 
-      if (audio.paused) return;
+      if (mode === "sample" || mode === "both") {
+        setSamplePitch(pitchInfo);
+      }
 
-      clearFade(name);
+      if (mode === "synth" || mode === "both") {
+        playSynthNote(pitchInfo);
+      }
 
-      const steps = 6;
-      const stepTime = duration / steps;
-      const startVolume = audio.volume;
+      log(
+        pitchInfo.label +
+        " | " +
+        pitchInfo.noteName +
+        " | Sample: " +
+        pitchInfo.playbackRate.toFixed(2) +
+        " | Synth: " +
+        pitchInfo.frequency.toFixed(2) +
+        " Hz"
+      );
 
-      let currentStep = 0;
-
-      fadeIntervals[name] = setInterval(() => {
-        currentStep++;
-        audio.volume = Math.max(0, startVolume * (1 - currentStep / steps));
-
-        if (currentStep >= steps) {
-          clearInterval(fadeIntervals[name]);
-          fadeIntervals[name] = null;
-          audio.pause();
-          audio.currentTime = 0;
-          audio.volume = 1.0;
-          log(`${name}: aus`);
-        }
-      }, stepTime);
+      updateDisplay(pitchInfo);
     }
 
-    function handleTrigger(value) {
-      log(`Empfangen: ${value}`);
+    function setSamplePitch(pitchInfo) {
+      pitch = pitchInfo.playbackRate;
 
-      switch (value) {
+      if (source) {
+        source.playbackRate.value = pitch;
+      }
+    }
+
+    function playSynthNote(pitchInfo) {
+      if (!audioContext || !masterGain) return;
+
+      const now = audioContext.currentTime;
+
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      const filter = audioContext.createBiquadFilter();
+
+      // Klangfarbe:
+      // "sine" = sehr weich
+      // "triangle" = weich/glockig
+      // "square" = retro
+      // "sawtooth" = rauer
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(pitchInfo.frequency, now);
+
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(1800, now);
+      filter.Q.setValueAtTime(0.8, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.35, now + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(masterGain);
+
+      osc.start(now);
+      osc.stop(now + 0.9);
+
+      noteStateEl.textContent = "Synth: " + pitchInfo.noteName;
+      noteStateEl.classList.add("active");
+    }
+
+    async function handleTrigger(value) {
+      const message = value.trim();
+      log("Empfangen: " + message);
+
+      switch (message) {
+        case "pitch_1":
+        case "pitch_2":
+        case "pitch_3":
+        case "pitch_4":
+        case "pitch_5":
+        case "pitch_6":
+          await handlePitchMessage(message);
+          break;
+
+        case "loop_toggle":
+          await toggleLoop();
+          break;
+
+        // Kompatibilität mit alten ESP32-Versionen
         case "sound1_on":
-          startSound("sound1");
+          await ensureAudioReady();
+          if (!loopPlaying) startLoop();
           break;
+
         case "sound1_off":
-          stopSound("sound1");
-          break;
-
-        case "sound2_on":
-          startSound("sound2");
-          break;
-        case "sound2_off":
-          stopSound("sound2");
-          break;
-
-        case "sound3_on":
-          startSound("sound3");
-          break;
-        case "sound3_off":
-          stopSound("sound3");
+          stopLoop();
           break;
 
         default:
-          log(`Unbekannter Trigger: ${value}`);
+          log("Unbekannter Trigger: " + message);
       }
     }
 
     async function connectToEsp() {
       try {
+        await initAudio();
+
         statusEl.textContent = "Suche ESP32...";
 
         const device = await navigator.bluetooth.requestDevice({
@@ -250,6 +603,7 @@
         });
 
         statusEl.textContent = "Verbinde...";
+
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
         const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
@@ -271,38 +625,68 @@
       }
     }
 
-    connectBtn.addEventListener("click", connectToEsp);
+    function updateDisplay(pitchInfo = null) {
+      pitchValueEl.textContent = pitch.toFixed(2);
 
-    document.getElementById("test1").addEventListener("click", async () => {
-      testState.sound1 = !testState.sound1;
-      if (testState.sound1) {
-        await startSound("sound1");
-      } else {
-        stopSound("sound1");
-      }
-    });
+      const pitchPercent = ((pitch - minPitch) / (maxPitch - minPitch)) * 100;
+      pitchBarEl.style.width = Math.min(100, Math.max(0, pitchPercent)) + "%";
 
-    document.getElementById("test2").addEventListener("click", async () => {
-      testState.sound2 = !testState.sound2;
-      if (testState.sound2) {
-        await startSound("sound2");
-      } else {
-        stopSound("sound2");
-      }
-    });
+      modeBtn.textContent = "Modus: " + getModeLabel();
+      modeStateEl.textContent = "Modus: " + getModeLabel();
 
-    document.getElementById("test3").addEventListener("click", async () => {
-      testState.sound3 = !testState.sound3;
-      if (testState.sound3) {
-        await startSound("sound3");
+      loopStateEl.textContent = loopPlaying ? "Loop: läuft" : "Loop: aus";
+      loopStateEl.classList.toggle("active", loopPlaying);
+
+      if (pitchInfo) {
+        pitchStateEl.textContent =
+          pitchInfo.label +
+          " / " +
+          pitchInfo.noteName +
+          " / " +
+          pitchInfo.frequency.toFixed(0) +
+          " Hz";
       } else {
-        stopSound("sound3");
+        pitchStateEl.textContent = "Tonhöhe: " + pitch.toFixed(2);
       }
-    });
-    if (!navigator.bluetooth) {
-      document.getElementById("status").textContent =
-        "Web Bluetooth wird auf diesem Gerät oder Browser nicht unterstützt.";
+
+      pitchStateEl.classList.add("active");
     }
+
+    audioBtn.addEventListener("click", initAudio);
+    connectBtn.addEventListener("click", connectToEsp);
+    loopBtn.addEventListener("click", toggleLoop);
+    modeBtn.addEventListener("click", toggleMode);
+
+    document.getElementById("testPitch1").addEventListener("click", () => {
+      handleTrigger("pitch_1");
+    });
+
+    document.getElementById("testPitch2").addEventListener("click", () => {
+      handleTrigger("pitch_2");
+    });
+
+    document.getElementById("testPitch3").addEventListener("click", () => {
+      handleTrigger("pitch_3");
+    });
+
+    document.getElementById("testPitch4").addEventListener("click", () => {
+      handleTrigger("pitch_4");
+    });
+
+    document.getElementById("testPitch5").addEventListener("click", () => {
+      handleTrigger("pitch_5");
+    });
+
+    document.getElementById("testPitch6").addEventListener("click", () => {
+      handleTrigger("pitch_6");
+    });
+
+    if (!navigator.bluetooth) {
+      statusEl.textContent =
+        "Web Bluetooth wird auf diesem Gerät oder Browser nicht unterstützt. Nutze am besten Chrome oder Edge.";
+    }
+
+    updateDisplay();
   </script>
 </body>
 </html>
